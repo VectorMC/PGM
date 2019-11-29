@@ -6,6 +6,7 @@ import java.util.*;
 import java.util.logging.Level;
 import javax.annotation.Nullable;
 import org.bukkit.Location;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
@@ -17,6 +18,8 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerAttackEntityEvent;
 import org.bukkit.event.player.PlayerInitialSpawnEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.util.Vector;
 import org.jdom2.Element;
 import tc.oc.pgm.api.PGM;
 import tc.oc.pgm.api.match.Match;
@@ -32,9 +35,7 @@ import tc.oc.pgm.events.PlayerJoinPartyEvent;
 import tc.oc.pgm.events.PlayerPartyChangeEvent;
 import tc.oc.pgm.match.MatchModule;
 import tc.oc.pgm.modules.EventFilterMatchModule;
-import tc.oc.pgm.spawns.states.Joining;
-import tc.oc.pgm.spawns.states.Observing;
-import tc.oc.pgm.spawns.states.State;
+import tc.oc.pgm.spawns.states.*;
 import tc.oc.util.RandomUtils;
 import tc.oc.xml.InvalidXMLException;
 
@@ -213,6 +214,39 @@ public class SpawnMatchModule extends MatchModule implements Listener {
     if (player != null) {
       State state = states.get(player);
       if (state != null) state.onEvent(event);
+    }
+  }
+
+  @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+  public void onDamage(final EntityDamageEvent event) {
+    Entity entity = event.getEntity();
+    if (entity instanceof Player) {
+      MatchPlayer player = getMatch().getPlayer(((Player) event.getEntity()));
+      State state = states.get(player);
+      if (state instanceof Spawning) {
+        event.setCancelled(true);
+      }
+    }
+  }
+
+  @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+  public void onMove(final PlayerMoveEvent event) {
+    Player bukkit = event.getPlayer();
+    MatchPlayer player = getMatch().getPlayer(bukkit);
+    if (player != null) {
+      State state = states.get(player);
+      if (state instanceof Spawning) {
+        Location location = bukkit.getLocation();
+        // Push them up from the void so they don't keep falling
+        if (location.getY() < -50) {
+          bukkit.setVelocity(new Vector(0, 4.0D, 0));
+        }
+        // keep players inside x and z coords, but allow them to fall
+        if (event.getTo().getX() != event.getFrom().getX()
+            || event.getTo().getZ() != event.getFrom().getZ()) {
+          bukkit.teleport(event.getFrom());
+        }
+      }
     }
   }
 

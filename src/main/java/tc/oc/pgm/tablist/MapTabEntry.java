@@ -42,10 +42,12 @@ public class MapTabEntry extends DynamicTabEntry {
               new PersonalizedTranslatable(
                   "misc.authorship",
                   content,
-                  TranslationUtils.combineComponents(
-                      authors.stream()
-                          .map(contributor -> contributor.getStyledName(NameStyle.FANCY))
-                          .collect(Collectors.toList()))),
+                  new PersonalizedText(
+                      TranslationUtils.combineComponents(
+                          authors.stream()
+                              .map(contributor -> contributor.getStyledName(NameStyle.FANCY))
+                              .collect(Collectors.toList())),
+                      ChatColor.DARK_AQUA)),
               ChatColor.DARK_GRAY);
     }
 
