@@ -6,7 +6,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import javax.annotation.Nullable;
-import org.bukkit.Bukkit;
 import tc.oc.component.Component;
 import tc.oc.component.types.PersonalizedPlayer;
 import tc.oc.component.types.PersonalizedText;
@@ -14,6 +13,8 @@ import tc.oc.identity.Identity;
 import tc.oc.identity.RealIdentity;
 import tc.oc.named.NameStyle;
 import tc.oc.named.Named;
+import tc.oc.named.NicknameRenderer;
+import tc.oc.pgm.api.PGM;
 
 /**
  * A contributor to a {@link PGMMap}. Can have either or both of a UUID and arbitrary String name.
@@ -22,11 +23,10 @@ import tc.oc.named.Named;
  * without a Minecraft account, like mom or Jesus).
  */
 public class Contributor implements Named {
-  protected final @Nullable UUID uuid;
-  protected final @Nullable String fallbackName;
-  protected final @Nullable String contribution;
 
-  protected @Nullable UUID playerId;
+  private final @Nullable UUID uuid;
+  private final @Nullable String fallbackName;
+  private final @Nullable String contribution;
 
   /** Creates a contributor with a name and a contribution. */
   public Contributor(
@@ -36,11 +36,14 @@ public class Contributor implements Named {
     this.contribution = contribution;
 
     checkArgument(uuid != null || fallbackName != null);
+
+    // Pre-warm cache before matches load to ensure load times are fast
+    getName();
   }
 
   @Override
   public String toString() {
-    return this.getName();
+    return getName();
   }
 
   public @Nullable UUID getUuid() {
@@ -49,49 +52,42 @@ public class Contributor implements Named {
 
   /** Gets the name of this contributor. */
   public @Nullable String getName() {
-    // ASHCON
-    UUID pid = this.playerId;
-    return pid != null ? this.fallbackName : this.fallbackName;
+    return uuid == null ? fallbackName : PGM.get().getDatastoreCache().getUsername(uuid).getName();
   }
 
   public @Nullable UUID getPlayerId() {
-    return playerId;
-  }
-
-  public void setPlayerId(UUID playerId) {
-    this.playerId = playerId;
+    return uuid;
   }
 
   public @Nullable Identity getIdentity() {
-    return playerId == null
-        ? null
-        : new RealIdentity(getPlayerId(), Bukkit.getPlayer(getPlayerId()).getName());
+    if (uuid == null) return null;
+    final String name = getName();
+    if (name == null) return null;
+    return new RealIdentity(getPlayerId(), name);
   }
 
   @Override
   public Component getStyledName(NameStyle style) {
-    return playerId != null
-        ? new PersonalizedPlayer(getIdentity(), style)
-        : new PersonalizedText(fallbackName);
+    final Identity identity = getIdentity();
+    return identity == null
+        ? new PersonalizedText(
+            fallbackName == null ? "Unknown" : fallbackName, NicknameRenderer.OFFLINE_COLOR)
+        : new PersonalizedPlayer(identity, style);
   }
 
   /** @return true only if a username is available */
   public boolean hasName() {
-    return this.playerId != null || this.fallbackName != null;
-  }
-
-  public boolean needsLookup() {
-    return this.uuid != null && this.playerId == null;
+    return getName() != null;
   }
 
   /** Indicates whether or not this contributor has a specific contribution. */
   public boolean hasContribution() {
-    return this.contribution != null;
+    return contribution != null;
   }
 
   /** Gets this contributor's contribution or null if none exists. */
   public @Nullable String getContribution() {
-    return this.contribution;
+    return contribution;
   }
 
   public static List<Contributor> filterNamed(List<Contributor> contributors) {

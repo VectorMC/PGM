@@ -1,16 +1,21 @@
 package tc.oc.pgm;
 
 import com.google.common.collect.ImmutableList;
+import java.util.Map;
+import java.util.TreeMap;
 import javax.annotation.Nullable;
 import org.bukkit.ChatColor;
 import org.bukkit.configuration.Configuration;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.permissions.Permission;
+import org.bukkit.permissions.PermissionDefault;
 import org.joda.time.Duration;
 import tc.oc.pgm.api.PGM;
+import tc.oc.pgm.api.Permissions;
 import tc.oc.pgm.events.ConfigLoadEvent;
 
 public class Config {
@@ -33,23 +38,27 @@ public class Config {
     }
   }
 
+  public static class Rotations {
+    public static boolean areEnabled() {
+      return getConfiguration().getBoolean("rotations.enabled");
+    }
+
+    public static String getPath() {
+      return getConfiguration().getString("rotations.path");
+    }
+  }
+
   public static class AutoRestart {
-    private final Configuration config;
-
-    public AutoRestart(Configuration config) {
-      this.config = config;
+    public static boolean enabled() {
+      return getConfiguration().getBoolean("restart.enabled", false);
     }
 
-    public boolean enabled() {
-      return this.config.getBoolean("restart.enabled", false);
+    public static Duration time() {
+      return Duration.standardSeconds(getConfiguration().getInt("restart.time", 30)); // seconds
     }
 
-    public Duration time() {
-      return Duration.standardSeconds(this.config.getInt("restart.time", 30)); // seconds
-    }
-
-    public int matchLimit() {
-      return this.config.getInt("restart.match-limit", 30);
+    public static int matchLimit() {
+      return getConfiguration().getInt("restart.match-limit", 30);
     }
   }
 
@@ -262,6 +271,117 @@ public class Config {
                 .toUpperCase()
                 .replace(' ', '_'));
       }
+    }
+  }
+
+  public static class Prefixes implements Listener {
+    private Map<String, Prefix> prefixes = new TreeMap<String, Prefix>();
+
+    @EventHandler
+    public void onConfigLoad(ConfigLoadEvent event) throws InvalidConfigurationException {
+      final ConfigurationSection section = event.getConfig().getConfigurationSection("groups");
+      for (String key : section.getKeys(false)) {
+        if (section.getConfigurationSection(key + ".prefix") == null) {
+          continue;
+        }
+        prefixes.put(
+            key,
+            new Prefix(
+                key,
+                section.getInt(key + ".priority"),
+                section.getString(key + ".prefix.symbol"),
+                ChatColor.valueOf(
+                    section
+                        .getString(key + ".prefix.color")
+                        .trim()
+                        .toUpperCase()
+                        .replace(' ', '_')),
+                section.getBoolean(key + ".op")));
+      }
+    }
+
+    private static final Prefixes instance = new Prefixes();
+
+    public static Prefixes get() {
+      return instance;
+    }
+
+    public static boolean enabled() {
+      return instance.prefixes.size() > 0;
+    }
+
+    public static Map<String, Prefix> getPrefixes() {
+      return instance.prefixes;
+    }
+
+    public static class Prefix implements Comparable<Prefix> {
+      public String name;
+      public int priority;
+      public String symbol;
+      public ChatColor color;
+      public Permission permission;
+
+      public Prefix(String name, int priority, String symbol, ChatColor color, boolean op) {
+        this.name = name;
+        this.priority = priority;
+        this.symbol = symbol;
+        this.color = color;
+        this.permission =
+            Permissions.register(
+                Permissions.GROUP + "." + name,
+                op ? PermissionDefault.OP : PermissionDefault.FALSE);
+      }
+
+      @Override
+      public int compareTo(Prefix other) {
+        return Integer.compare(priority, other.priority);
+      }
+
+      @Override
+      public String toString() {
+        return color + symbol;
+      }
+    }
+  }
+
+  public static class Experiments implements Listener {
+    private int preload;
+    private boolean avoidDoubleTp;
+    private int tabRenderDelay;
+    private int destroyMatchDelay;
+
+    @EventHandler
+    public void onConfigLoad(ConfigLoadEvent event) throws InvalidConfigurationException {
+      this.load(event.getConfig().getConfigurationSection("experiments"));
+    }
+
+    public void load(ConfigurationSection config) throws InvalidConfigurationException {
+      this.preload = config.getInt("preload-matches", 3);
+      this.avoidDoubleTp = config.getBoolean("avoid-double-teleport", true);
+      this.tabRenderDelay = config.getInt("tab-render-delay", 5);
+      this.destroyMatchDelay = config.getInt("destroy-match-delay", 100);
+    }
+
+    private static final Experiments instance = new Experiments();
+
+    public static Experiments get() {
+      return instance;
+    }
+
+    public int getPreload() {
+      return preload;
+    }
+
+    public boolean isAvoidDoubleTp() {
+      return avoidDoubleTp;
+    }
+
+    public int getTabRenderDelay() {
+      return tabRenderDelay;
+    }
+
+    public int getDestroyMatchDelay() {
+      return destroyMatchDelay;
     }
   }
 }

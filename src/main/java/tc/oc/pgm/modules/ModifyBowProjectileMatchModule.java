@@ -48,9 +48,13 @@ public class ModifyBowProjectileMatchModule extends MatchModule implements Liste
       newProjectile = event.getProjectile();
     } else {
       // Replace the projectile
-      World world = event.getEntity().getWorld();
       Projectile oldEntity = (Projectile) event.getProjectile();
-      newProjectile = world.spawn(oldEntity.getLocation(), this.cls);
+      if (this.cls.isAssignableFrom(Projectile.class)) {
+        newProjectile = event.getEntity().launchProjectile((Class<? extends Projectile>) this.cls);
+      } else {
+        World world = event.getEntity().getWorld();
+        newProjectile = world.spawn(oldEntity.getLocation(), this.cls);
+      }
       event.setProjectile(newProjectile);
 
       // Copy some things from the old projectile

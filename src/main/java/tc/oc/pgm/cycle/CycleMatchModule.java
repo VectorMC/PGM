@@ -9,10 +9,8 @@ import tc.oc.pgm.api.match.Match;
 import tc.oc.pgm.api.match.MatchManager;
 import tc.oc.pgm.api.match.MatchScope;
 import tc.oc.pgm.api.match.event.MatchFinishEvent;
-import tc.oc.pgm.commands.MapCommands;
 import tc.oc.pgm.events.ListenerScope;
 import tc.oc.pgm.events.PlayerPartyChangeEvent;
-import tc.oc.pgm.map.PGMMap;
 import tc.oc.pgm.match.MatchModule;
 import tc.oc.pgm.match.MatchModuleFactory;
 import tc.oc.pgm.module.ModuleDescription;
@@ -43,28 +41,16 @@ public class CycleMatchModule extends MatchModule implements Listener {
   }
 
   public void cycleNow() {
-    cycleNow(null);
+    startCountdown(Duration.ZERO);
   }
 
-  public void cycleNow(PGMMap map) {
-    startCountdown(Duration.ZERO, map);
-  }
-
-  public void startCountdown(PGMMap nextMap) {
-    startCountdown(null, nextMap);
-  }
-
-  public void startCountdown(Duration duration) {
-    startCountdown(duration, MapCommands.peekNextMap());
-  }
-
-  public void startCountdown(@Nullable Duration duration, PGMMap nextMap) {
+  public void startCountdown(@Nullable Duration duration) {
     if (duration == null) duration = config.countdown();
     getMatch().finish();
     if (Duration.ZERO.equals(duration)) {
-      mm.cycleMatch(getMatch(), nextMap, false);
+      mm.cycleMatch(getMatch(), mm.getMapOrder().popNextMap(), false);
     } else {
-      getMatch().getCountdown().start(new CycleCountdown(mm, getMatch(), nextMap), duration);
+      getMatch().getCountdown().start(new CycleCountdown(mm, getMatch()), duration);
     }
   }
 
@@ -83,7 +69,9 @@ public class CycleMatchModule extends MatchModule implements Listener {
   @EventHandler
   public void onMatchEnd(MatchFinishEvent event) {
     final Match match = event.getMatch();
-    if (!RestartManager.get().isRestartRequested()) {
+    mm.getMapOrder().matchEnded(match);
+
+    if (!RestartManager.isQueued()) {
       CycleConfig.Auto autoConfig = config.matchEnd();
       if (autoConfig.enabled()) {
         startCountdown(autoConfig.countdown());

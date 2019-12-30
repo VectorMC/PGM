@@ -4,8 +4,21 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
 import com.google.common.collect.Iterables;
+import java.io.File;
 import java.lang.ref.WeakReference;
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.LinkedList;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Random;
+import java.util.Set;
+import java.util.UUID;
+import java.util.WeakHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -14,12 +27,10 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.bukkit.event.EventException;
@@ -35,7 +46,13 @@ import tc.oc.pgm.api.match.Match;
 import tc.oc.pgm.api.match.MatchPhase;
 import tc.oc.pgm.api.match.MatchScope;
 import tc.oc.pgm.api.match.Tickable;
-import tc.oc.pgm.api.match.event.*;
+import tc.oc.pgm.api.match.event.MatchEvent;
+import tc.oc.pgm.api.match.event.MatchFinishEvent;
+import tc.oc.pgm.api.match.event.MatchLoadEvent;
+import tc.oc.pgm.api.match.event.MatchPhaseChangeEvent;
+import tc.oc.pgm.api.match.event.MatchResizeEvent;
+import tc.oc.pgm.api.match.event.MatchStartEvent;
+import tc.oc.pgm.api.match.event.MatchUnloadEvent;
 import tc.oc.pgm.api.party.Competitor;
 import tc.oc.pgm.api.party.Party;
 import tc.oc.pgm.api.party.event.CompetitorAddEvent;
@@ -47,7 +64,15 @@ import tc.oc.pgm.api.player.event.MatchPlayerAddEvent;
 import tc.oc.pgm.api.time.Tick;
 import tc.oc.pgm.countdowns.CountdownContext;
 import tc.oc.pgm.countdowns.SingleCountdownContext;
-import tc.oc.pgm.events.*;
+import tc.oc.pgm.events.ListenerScope;
+import tc.oc.pgm.events.PlayerJoinMatchEvent;
+import tc.oc.pgm.events.PlayerJoinPartyEvent;
+import tc.oc.pgm.events.PlayerLeaveMatchEvent;
+import tc.oc.pgm.events.PlayerLeavePartyEvent;
+import tc.oc.pgm.events.PlayerParticipationEvent;
+import tc.oc.pgm.events.PlayerParticipationStartEvent;
+import tc.oc.pgm.events.PlayerParticipationStopEvent;
+import tc.oc.pgm.events.PlayerPartyChangeEvent;
 import tc.oc.pgm.features.Feature;
 import tc.oc.pgm.features.MatchFeatureContext;
 import tc.oc.pgm.filters.query.MatchQuery;
@@ -61,6 +86,7 @@ import tc.oc.pgm.result.CompetitorVictoryCondition;
 import tc.oc.pgm.result.VictoryCondition;
 import tc.oc.server.Events;
 import tc.oc.server.Scheduler;
+import tc.oc.util.FileUtils;
 import tc.oc.util.collection.RankedSet;
 import tc.oc.util.logging.ClassLogger;
 import tc.oc.world.NMSHacks;
@@ -353,7 +379,7 @@ public class MatchImpl implements Match, Comparable<Match> {
   public void setMaxPlayers(int players) {
     int previous = capacity.getAndSet(players);
     if (previous != players) {
-      callEvent(new MatchResizeEvent(null));
+      callEvent(new MatchResizeEvent(this));
     }
   }
 
@@ -751,6 +777,7 @@ public class MatchImpl implements Match, Comparable<Match> {
       callEvent(new MatchLoadEvent(this));
     } catch (Throwable e) {
       unload();
+      destroy();
       throw e;
     }
   }
@@ -782,16 +809,6 @@ public class MatchImpl implements Match, Comparable<Match> {
       }
     }
 
-    Stream.of(getWorld().getLoadedChunks()).forEach(chunk -> chunk.unload(true, false));
-    getWorld().getEntities().stream().forEach(Entity::remove);
-
-    final boolean unloaded = PGM.get().getServer().unloadWorld(getWorld(), false);
-    if (!unloaded) {
-      logger.log(
-          Level.SEVERE,
-          "Unable to unload world " + getWorld().getName() + " (this can cause memory leaks!)");
-    }
-
     schedulers.clear();
     listeners.clear();
     tickables.clear();
@@ -806,6 +823,32 @@ public class MatchImpl implements Match, Comparable<Match> {
     world.enqueue();
 
     loaded.compareAndSet(true, false);
+  }
+
+  @Override
+  public void destroy() {
+    if (isLoaded()) {
+      logger.log(
+          Level.SEVERE,
+          "Match " + getId() + " is being destroyed without having previously been unloaded");
+      unload();
+    }
+
+    World world = getWorld();
+    if (world == null) return;
+
+    final String worldName = world.getName();
+    if (PGM.get().getServer().unloadWorld(worldName, false)) {
+      logger.fine("Successfully unloaded " + worldName);
+    } else {
+      logger.log(
+          Level.SEVERE, "Unable to unload world " + worldName + " (this can cause memory leaks!)");
+    }
+
+    final File oldMatchFolder = new File(PGM.get().getServer().getWorldContainer(), worldName);
+    if (oldMatchFolder.exists()) {
+      FileUtils.delete(oldMatchFolder);
+    }
   }
 
   @Override

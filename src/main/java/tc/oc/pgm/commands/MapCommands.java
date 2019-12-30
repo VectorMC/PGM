@@ -5,23 +5,19 @@ import app.ashcon.intake.CommandException;
 import app.ashcon.intake.parametric.annotation.Default;
 import com.google.common.collect.ImmutableSortedSet;
 import java.net.URL;
-import java.util.*;
+import java.util.List;
+import java.util.Set;
 import javax.annotation.Nullable;
 import net.md_5.bungee.api.ChatColor;
 import net.md_5.bungee.api.chat.HoverEvent;
 import org.bukkit.command.CommandSender;
 import tc.oc.component.Component;
-import tc.oc.component.types.PersonalizedPlayer;
 import tc.oc.component.types.PersonalizedText;
 import tc.oc.component.types.PersonalizedTranslatable;
-import tc.oc.identity.Identity;
 import tc.oc.named.NameStyle;
-import tc.oc.named.NicknameRenderer;
 import tc.oc.pgm.AllTranslations;
-import tc.oc.pgm.api.PGM;
 import tc.oc.pgm.api.Permissions;
 import tc.oc.pgm.api.chat.Audience;
-import tc.oc.pgm.api.match.Match;
 import tc.oc.pgm.api.match.MatchManager;
 import tc.oc.pgm.commands.annotations.Text;
 import tc.oc.pgm.map.Contributor;
@@ -32,38 +28,6 @@ import tc.oc.pgm.util.PrettyPaginatedResult;
 import tc.oc.util.components.Components;
 
 public class MapCommands {
-
-  // FIXME: This is temporary until a new rotation/vote system is determined.
-  private static PGMMap nextMap;
-
-  public static PGMMap peekNextMap() {
-    if (nextMap != null) {
-      return nextMap;
-    }
-
-    Iterator<Match> iterator = PGM.get().getMatchManager().getMatches().iterator();
-    PGMMap current = iterator.hasNext() ? iterator.next().getMap() : null;
-
-    List<PGMMap> maps = new ArrayList<>(PGM.get().getMapLibrary().getMaps());
-    PGMMap next;
-    do {
-      Collections.shuffle(maps);
-      next = maps.get(0);
-    } while (maps.size() > 1 && Objects.equals(current, next));
-
-    setNextMap(next);
-    return next;
-  }
-
-  public static void setNextMap(PGMMap map) {
-    nextMap = map;
-  }
-
-  public static PGMMap popNextMap() {
-    PGMMap peek = peekNextMap();
-    nextMap = null;
-    return peek;
-  }
 
   @Command(
       aliases = {"maplist", "maps", "ml"},
@@ -205,7 +169,14 @@ public class MapCommands {
       aliases = {"mapnext", "mn", "nextmap", "nm", "next"},
       desc = "Shows which map is coming up next")
   public void next(Audience audience, CommandSender sender, MatchManager matchManager) {
-    final PGMMap next = peekNextMap();
+    final PGMMap next = matchManager.getMapOrder().getNextMap();
+
+    if (next == null) {
+      sender.sendMessage(
+          ChatColor.RED + AllTranslations.get().translate("command.map.next.noNextMap", sender));
+      return;
+    }
+
     audience.sendMessage(
         ChatColor.DARK_PURPLE
             + AllTranslations.get()
@@ -216,27 +187,13 @@ public class MapCommands {
   }
 
   private @Nullable Component formatContribution(Contributor contributor) {
-    Component c = formatContributor(contributor);
-    if (c == null || !contributor.hasContribution()) return c;
+    Component c = contributor.getStyledName(NameStyle.FANCY);
+    if (!contributor.hasContribution()) return c;
     return new PersonalizedText(
         c,
         new PersonalizedText(ChatColor.GRAY, ChatColor.ITALIC)
             .extra(" - ")
             .extra(contributor.getContribution()));
-  }
-
-  private @Nullable Component formatContributor(Contributor contributor) {
-    Identity identity = contributor.getIdentity();
-    if (identity != null) {
-      return new PersonalizedPlayer(identity, NameStyle.FANCY);
-    }
-
-    String name = contributor.getName();
-    if (name != null) {
-      return new PersonalizedText(name, NicknameRenderer.OFFLINE_COLOR);
-    }
-
-    return null;
   }
 
   private Component mapInfoLabel(String key) {

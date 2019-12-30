@@ -14,6 +14,10 @@ map:
     enabled: true
     reload-when-error: false
 
+rotations:
+  enabled: true
+  path: rotations.yml
+
 restart:
   enabled: true
   uptime: 3h
@@ -87,3 +91,21 @@ motd:
     starting: yellow                                     # Color designating a match which is starting
     running: green                                       # Color designating a match which is currently running
     finished: red                                        # Color designating a match which has ended
+
+groups:
+  admin:
+    op: true
+    priority: 10
+    prefix:
+      symbol: ❖
+      color: gold
+
+experiments:
+  # In seconds, when cycle reaches this number it will preload next match & world
+  preload-matches: 3
+  # Avoid twice tp on cycle (once to world spawn, later to obs spawn)
+  avoid-double-teleport: true
+  # Defer tab rendering to group more updates at once, in ticks
+  tab-render-delay: 5
+  # Ticks to wait to destroy older match
+  destroy-match-delay: 100

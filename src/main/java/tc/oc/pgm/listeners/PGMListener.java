@@ -11,12 +11,19 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
-import org.bukkit.event.player.*;
+import org.bukkit.event.player.PlayerFishEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerLoginEvent;
 import org.bukkit.event.player.PlayerLoginEvent.Result;
+import org.bukkit.event.player.PlayerPickupItemEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 import tc.oc.pgm.AllTranslations;
 import tc.oc.pgm.Config;
+import tc.oc.pgm.api.PGM;
 import tc.oc.pgm.api.Permissions;
 import tc.oc.pgm.api.match.Match;
 import tc.oc.pgm.api.match.MatchManager;
@@ -43,14 +50,14 @@ public class PGMListener implements Listener {
 
   @EventHandler
   public void onPlayerLogin(final PlayerLoginEvent event) {
-    // allow ops to join when the server is full
+    // allow premiums to join when the server is full
     if (event.getResult() == Result.KICK_FULL) {
       if (event.getPlayer().hasPermission(Permissions.JOIN_FULL)) {
         event.allow();
       } else {
         event.setKickMessage(
-            AllTranslations.get()
-                .translate("serverFull", mm.getPlayer(event.getPlayer()).getBukkit()));
+            AllTranslations.get() // MatchPlayer is not available at this time
+                .translate("serverFull", null));
       }
     }
   }
@@ -125,6 +132,7 @@ public class PGMListener implements Listener {
     }
 
     match.removePlayer(event.getPlayer());
+    PGM.get().getPrefixRegistry().removePlayer(event.getPlayer().getUniqueId());
   }
 
   @EventHandler(priority = EventPriority.MONITOR)

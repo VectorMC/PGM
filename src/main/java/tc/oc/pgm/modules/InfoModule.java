@@ -10,7 +10,11 @@ import org.jdom2.Document;
 import org.jdom2.Element;
 import tc.oc.component.Component;
 import tc.oc.component.types.PersonalizedText;
-import tc.oc.pgm.map.*;
+import tc.oc.pgm.map.Contributor;
+import tc.oc.pgm.map.MapInfo;
+import tc.oc.pgm.map.MapModule;
+import tc.oc.pgm.map.MapModuleContext;
+import tc.oc.pgm.map.ProtoVersions;
 import tc.oc.pgm.module.ModuleDescription;
 import tc.oc.pgm.util.XMLUtils;
 import tc.oc.util.SemanticVersion;
@@ -19,6 +23,7 @@ import tc.oc.xml.Node;
 
 @ModuleDescription(name = "Info")
 public class InfoModule extends MapModule {
+
   private final MapInfo info;
 
   public InfoModule(MapInfo info) {
@@ -42,13 +47,17 @@ public class InfoModule extends MapModule {
     for (Element elObjective : root.getChildren("objective")) {
       objective = elObjective.getTextNormalize();
     }
-    if (objective == null) throw new InvalidXMLException("'objective' element is required", root);
+    if (objective == null) {
+      throw new InvalidXMLException("'objective' element is required", root);
+    }
 
     String slug = root.getChildTextNormalize("slug");
     Component game = XMLUtils.parseFormattedText(root, "game");
 
     List<Contributor> authors = readContributorList(root, "authors", "author");
-    if (authors.isEmpty()) throw new InvalidXMLException("map must have at least one author", root);
+    if (authors.isEmpty()) {
+      throw new InvalidXMLException("map must have at least one author", root);
+    }
 
     if (game != null) {
       Element blitz = root.getChild("blitz");

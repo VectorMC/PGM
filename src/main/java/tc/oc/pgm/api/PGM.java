@@ -12,10 +12,26 @@ import tc.oc.pgm.api.match.MatchManager;
 import tc.oc.pgm.development.MapErrorTracker;
 import tc.oc.pgm.map.MapLibrary;
 import tc.oc.pgm.map.PGMMap;
+import tc.oc.pgm.prefix.PrefixRegistry;
+import tc.oc.pgm.tablist.MatchTabManager;
 import tc.oc.util.SemanticVersion;
 
 /** PvP Game Manager (aka. PGM), the global {@link Plugin} to manage PvP games. */
 public interface PGM extends Plugin {
+
+  /**
+   * Get a datastore that persists between matches and server restarts.
+   *
+   * @return A persistent, synchronous datastore.
+   */
+  Datastore getDatastore();
+
+  /**
+   * Get a cached datastore that persists between matches and server restarts.
+   *
+   * @return {@link #getDatastore()} wrapped in an in-memory cache.
+   */
+  Datastore getDatastoreCache();
 
   /**
    * Get the specific manager that loads and unloads {@link Match}s.
@@ -23,6 +39,8 @@ public interface PGM extends Plugin {
    * @return The {@link MatchManager}.
    */
   MatchManager getMatchManager();
+
+  MatchTabManager getMatchTabManager();
 
   /**
    * Get the specific manager that parses and loads {@link PGMMap}s.
@@ -52,6 +70,8 @@ public interface PGM extends Plugin {
    */
   MapErrorTracker getMapErrorTracker();
 
+  PrefixRegistry getPrefixRegistry();
+
   @Deprecated
   IdentityProvider getIdentityProvider();
 
@@ -60,7 +80,6 @@ public interface PGM extends Plugin {
 
   AtomicReference<PGM> GLOBAL = new AtomicReference<>(null);
 
-  @Deprecated
   static PGM set(PGM pgm) {
     try {
       get();
@@ -71,7 +90,6 @@ public interface PGM extends Plugin {
     return get();
   }
 
-  @Deprecated
   static PGM get() {
     final PGM pgm = GLOBAL.get();
     if (pgm == null) {
